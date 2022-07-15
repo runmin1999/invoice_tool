@@ -3,6 +3,7 @@ import re
 import os
 import shutil
 import openpyxl
+from openpyxl.utils import get_column_letter
 from gooey import Gooey, GooeyParser
 
 
@@ -18,80 +19,113 @@ def re_block(text):
 
 def get_pdf(dir_path):
     pdf_file = []
+    pdf_names = []
     for root, sub_dirs, file_names in os.walk(dir_path):
-        # print(file_names)
         for name in file_names:
             if name.endswith('.pdf') or name.endswith('.PDF'):
                 filepath = os.path.join(root, name)
                 filepath = filepath.replace('\\', '/')
                 pdf_file.append(filepath)
-    # print(pdf_file)
-    return pdf_file
+                pdf_names.append(name)
+    return pdf_file, pdf_names
 
 
 def read(root_dir):
-    filenames = get_pdf(root_dir)
-    # print(filenames)
-    return filenames
+    filepaths, filenames = get_pdf(root_dir)
+    return filepaths, filenames
 
 
-def save_pdf(filenames, out_dir):
+def save_pdf(filepaths, filenames, out_dir):
     Repeat_name_list = []
     Repeat_num_list = []
-    for filename in filenames:
-        # name_t_f = "没问题"
-        with pdfplumber.open(filename) as pdf:
+    for i, filepath in enumerate(filepaths):
+        itinerary = False
+        tax_id = "没检查"
+        invoice_name = "没检查"
+        # name_t_f = "没检查"
+        with pdfplumber.open(filepath) as pdf:
             first_page = pdf.pages[0]
             pdf_text = first_page.extract_text()
             # pdf_tables = first_page.extract_tables()
 
-            if "91440300MA5GC316X2" in pdf_text or "9 1440300MA5GC316X2" in pdf_text:
-                name_t_f = "纳税号_对了"
-                if "佛山市顺德区瑞磐科技有限公司龙华分公司" in pdf_text:
-                    name_t_f = "纳税号和抬头_都对了"
-                else:
-                    name_t_f = "纳税号_对了，但抬头_错了"
+            if "行程单" in pdf_text:
+                itinerary = True
             else:
-                name_t_f = "纳税号_错了"
-                if "佛山市顺德区瑞磐科技有限公司龙华分公司" in pdf_text:
-                    name_t_f = "抬头_对了，但纳税号_错了"
+                if "91440300MA5GC316X2" in pdf_text or "9 1440300MA5GC316X2" in pdf_text:
+                    tax_id = "对了"
+                    # name_t_f = "纳税号_对了"
+                    if "佛山市顺德区瑞磐科技有限公司龙华分公司" in pdf_text:
+                        invoice_name = "对了"
+                        # name_t_f = "纳税号和抬头_都对了"
+                    else:
+                        invoice_name = "×了"
+                        # name_t_f = "纳税号_对了，但抬头_错了"
                 else:
-                    name_t_f = "纳税号和抬头_都错了"
+                    tax_id = "×了"
+                    # name_t_f = "纳税号_错了"
+                    if "佛山市顺德区瑞磐科技有限公司龙华分公司" in pdf_text:
+                        invoice_name = "对了"
+                        # name_t_f = "抬头_对了，但纳税号_错了"
+                    else:
+                        invoice_name = "×了"
+                        # name_t_f = "纳税号和抬头_都错了"
 
-            print(name_t_f)
-            print(pdf_text)
-            print("=======================================================")
+            # print(name_t_f)
+            # print(pdf_text)
+            # print("=======================================================")
 
-            list_excel = re_info(pdf_text, name_t_f, filename)
+            if not itinerary is True:
+                list_excel = re_info_1(
+                    pdf_text, tax_id, invoice_name, filenames[i])
+                out_file_name = list_excel[4] + "-" + str(list_excel[5])
+            else:
+                list_excel = re_info_2(
+                    pdf_text, tax_id, invoice_name, filenames[i])
+                out_file_name = "行程单"
 
-            out_file_name = list_excel[4] + "-" + str(list_excel[5])
+            list_excel.append(out_file_name + ".pdf")
 
-            Repeat_num_list.append(list_excel[2])
-            if list_excel[2] in Repeat_num_list:
-                repeat_num = Repeat_num_list.count(list_excel[2])
-                if repeat_num > 1:
-                    list_excel[3] = "重复"
-            save_excel(out_dir, sheet_name='Sheet1', value_list=list_excel)
+            copy_rename(filepath, out_dir, Repeat_name_list,
+                        Repeat_num_list, out_file_name, list_excel)
 
-            Repeat_name_list.append(out_file_name)
-            if out_file_name in Repeat_name_list:
-                repeat_num = Repeat_name_list.count(out_file_name)
-                if repeat_num == 1:
-                    out_file_name = out_file_name
-                else:
-                    out_file_name = out_file_name + \
-                        "(" + str(repeat_num-1) + ")"
-
-            dst = os.path.join(out_dir, out_file_name+".pdf")
-            shutil.copy(filename, dst)
     return "OK"
 
 
-def re_info(pdf_text, name_t_f, filename):
+def copy_rename(filename, out_dir, Repeat_name_list, Repeat_num_list,  out_file_name, list_excel=None):
+
+    if list_excel is not None:
+        Repeat_num_list.append(list_excel[2])
+        if list_excel[2] in Repeat_num_list:
+            repeat_num = Repeat_num_list.count(list_excel[2])
+            if repeat_num > 1:
+                list_excel[3] = "重复"
+
+    save_excel(out_dir, sheet_name='Sheet1', value_list=list_excel)
+
+    Repeat_name_list.append(out_file_name)
+    if out_file_name in Repeat_name_list:
+        repeat_num = Repeat_name_list.count(out_file_name)
+        if repeat_num == 1:
+            out_file_name = out_file_name
+        elif list_excel[3] == "重复":
+            out_file_name = out_file_name + \
+                "(" + "重复" + ")"
+        else:
+            out_file_name = out_file_name + \
+                "(" + str(repeat_num-1) + ")"
+
+    dst = os.path.join(out_dir, out_file_name+".pdf")
+    shutil.copy(filename, dst)
+
+    return None
+
+
+def re_info_1(pdf_text, tax_id, invoice_name, filename):
     list_excel = []
-    invoice_name = (
-        re_text(re.compile(r'名\s*称\s*[:：]\s*([\u4e00-\u9fa5]+)'), pdf_text))
-    invoice_name = invoice_name.split(":", 1)[-1]
+
+    # invoice_name = (
+    #     re_text(re.compile(r'名\s*称\s*[:：]\s*([\u4e00-\u9fa5]+)'), pdf_text))
+    # invoice_name = invoice_name.split(":", 1)[-1]
 
     invoice_number = (re_text(re.compile(r'发票号码(.*\d+)'), pdf_text))
     invoice_number = invoice_number.split(":", 1)[-1]
@@ -112,12 +146,8 @@ def re_info(pdf_text, name_t_f, filename):
     elif "服务费" in pdf_text and "住宿" in pdf_text:
         invoice_type_true = "住宿费"
 
-    corporate_name = (
-        re_text(re.compile(r'名\s*称\s*[:：]\s*([\u4e00-\u9fa5]+)'), pdf_text))
-    corporate_name = corporate_name.split(":", 1)[-1]
-
-    tax_id = (re_text(re.compile(r'纳税人识别号\s*[:：]\s*([a-zA-Z0-9]+)'), pdf_text))
-    tax_id = tax_id.split(":", 1)[-1]
+    # tax_id = (re_text(re.compile(r'纳税人识别号\s*[:：]\s*([a-zA-Z0-9]+)'), pdf_text))
+    # tax_id = tax_id.split(":", 1)[-1]
 
     total_price_ture = re_text(re.compile(r'(小写.*(.*[0-9.]+))'), pdf_text)
     if total_price_ture is None:
@@ -130,12 +160,40 @@ def re_info(pdf_text, name_t_f, filename):
         total_price_ture = total_price_ture.split("¥", 1)[-1]
 
     list_excel.append(invoice_name)
-    list_excel.append(name_t_f)
+    list_excel.append(tax_id)
     list_excel.append(int(invoice_number))
     list_excel.append("无重复")
     list_excel.append(invoice_type_true)
     list_excel.append(float(total_price_ture))
     list_excel.append(invoice_date)
+    list_excel.append(filename)
+
+    return list_excel
+
+
+def re_info_2(pdf_text, tax_id, invoice_name, filename):
+    list_excel = []
+    
+    # invoice_name = (
+    #     re_text(re.compile(r'发\s*票\s*抬\s*头\s*[:：]\s*([\u4e00-\u9fa5]+)'), pdf_text))
+    # invoice_name = invoice_name.split(":", 1)[-1]
+
+    # invoice_number = (re_text(re.compile(r'发票号码(.*\d+)'), pdf_text))
+    # invoice_number = invoice_number.split(":", 1)[-1]
+
+    # invoice_date = (re_text(re.compile(r'开票时间(.*) '), pdf_text))
+    # invoice_date = invoice_date.split(":", 1)[-1]
+
+    # total_price_ture = re_text(re.compile(r'(发票金额(.*[0-9.]元))'), pdf_text)
+    # total_price_ture = total_price_ture[:-1].split(":", 1)[-1]
+
+    list_excel.append("")
+    list_excel.append("")
+    list_excel.append("")
+    list_excel.append("")
+    list_excel.append("行程单")
+    list_excel.append("")
+    list_excel.append("")
     list_excel.append(filename)
 
     return list_excel
@@ -152,19 +210,20 @@ def save_excel(path, sheet_name='Sheet1', value_list=[[]]):
         workbook = openpyxl.Workbook()
         workbook.create_sheet("Sheet1", 0)
         Sheet = workbook['Sheet1']
-        title = ['公司名称', '名称是否正确', '发票号码', '发票是否重复',
-                 '发票类型', '金额汇总', '开票日期', '原pdf名称']
+        title = ['抬头正否', '纳税号正否', '发票号码', '发票重否',
+                 '发票类型', '金额汇总', '开票日期', '原pdf名称', '改后pdf名称']
         Sheet.append(title)
         # 保存文件
         workbook.save(path)
-        # print(f'文件{path}不存在，创建新表格')
     if len(value_list) != 0:
         workbook = openpyxl.load_workbook(path)
         for line in value_list:
             sheet = workbook[sheet_name]
             sheet.append(line)
+            for item, value in enumerate(line):
+                sheet.column_dimensions[get_column_letter(
+                    item+1)].width = 1.8*len(str(value)) + 2
         workbook.save(path)  # 保存工作簿
-        # print(f"表格 {path}【追加】写入数据成功！")
     workbook.close()
     return "ok"
 
@@ -227,16 +286,16 @@ def GUI():
 if __name__ == '__main__':
     # root_dir, out_dir, rename_dir = GUI()
 
-    root_dir = "E:\Code\Functional_modules\pdf_excel\错误发票"
+    root_dir = "E:\Code\Functional_modules\pdf_excel\发票1"
     out_dir = "E:\Code\Functional_modules\pdf_excel\DEMO"
     rename_dir = None
 
     if root_dir is not None and out_dir is not None and root_dir != ' ' and out_dir != ' ':
         root_dir = root_dir.replace("\\", '/').replace("//", '/')
         out_dir = out_dir.replace("\\", '/').replace("//", '/')
-        filenames = read(root_dir.strip())
-        if filenames != []:
-            save_state = save_pdf(filenames, out_dir.strip())
+        filepaths, filenames = read(root_dir.strip())
+        if filepaths != []:
+            save_state = save_pdf(filepaths, filenames, out_dir.strip())
             state = save_state
             print("0、请使用pdf原文件")
             print("1、成功复制PDF后重新命名")

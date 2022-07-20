@@ -47,7 +47,6 @@ def new_folder(root_dir, out_dir, old_dir):
     new_dir = old_dir.replace(root_dir, out_dir)
     new_sheet = old_dir.replace(root_dir + "/", "")
     new_sheet = new_sheet.replace("/", "_")
-    # new_sheet = new_sheet.split("/")[-1]
     if not os.path.exists(new_dir):
         # 如果目标路径不存在原文件夹的话就创建
         os.makedirs(new_dir)
@@ -252,8 +251,6 @@ def save_excel_2(i, path, sheet_name, value_list=[[]]):
             Sheet.column_dimensions[get_column_letter(
                 item+1)].width = 1.8*len(str(value)) + 3
         workbook.save(path)
-    # else:
-    #     print("数据已存在")
 
     workbook.close()
     return "ok"
@@ -267,27 +264,26 @@ def find_exist(Sheet, value_list):
     return False
 
 
-def rename_pdf(filenames):
-    Rename_list = []
-    for filename in filenames:
-        filename_list = filename.split("/")
-        name_pdf = filename_list[-1].split("-")
-        str_new = "/"
-        filename_list[-1] = name_pdf[-1]
-        str_new = str_new.join(filename_list)
-
-        str_new = str_new.split(".pdf")[0]
-
-        Rename_list.append(str_new)
-        if str_new in Rename_list:
-            repeat_num = Rename_list.count(str_new)
-            if repeat_num == 1:
-                str_new = str_new
-            else:
-                str_new = str_new + \
-                    "(" + str(repeat_num-1) + ")"
-
-        os.rename(src=filename, dst=(str_new + ".pdf"))
+def rename_pdf(filepaths, filenames):
+    for i, filepath in enumerate(filepaths):
+        Rename_list = []
+        for j, filepathNeed in enumerate(filepath):
+            if filenames[i][j].endswith('.pdf') or filenames[i][j].endswith('.PDF'):
+                try:
+                    filenameNeed = filenames[i][j].split("-")[-1]
+                    Rename_list.append(filenameNeed)
+                    new_name = filepathNeed.replace(
+                        filenames[i][j], filenameNeed)
+                    if filenameNeed in Rename_list:
+                        repeat_num = Rename_list.count(filenameNeed)
+                        if repeat_num == 1:
+                            new_name = new_name
+                        else:
+                            new_name = new_name.replace(".PDF", "").replace(".pdf", "") + \
+                                "(" + str(repeat_num-1) + ")" + ".pdf"
+                    os.rename(filepathNeed, new_name)
+                except:
+                    pass
     return "ok"
 
 
@@ -325,13 +321,13 @@ def GUI():
 
 if __name__ == '__main__':
     # root_dir, out_dir, rename_dir = GUI()
-    # root_dir, rename_dir = GUI()
+    root_dir, rename_dir = GUI()
 
-    rename_dir = None
-    root_dir = None
-    out_dir = None
-    root_dir = "E:\Code\Functional_modules\pdf_excel\demo"
-    out_dir = root_dir + "_清洗_1"
+    # rename_dir = None
+    # root_dir = None
+    # out_dir = None
+    # root_dir = "E:\Code\Functional_modules\pdf_excel\demo"
+    out_dir = root_dir + "_清洗"
     # rename_dir = "E:\Code\Functional_modules\pdf_excel\demo_清洗"
 
     if root_dir is not None and out_dir is not None and root_dir != ' ' and out_dir != ' ':
@@ -339,8 +335,8 @@ if __name__ == '__main__':
         out_dir = out_dir.replace("\\", '/').replace("//", '/')
         filepaths, filenames, folderpaths = read(root_dir.strip())
         if filepaths != []:
-            save_state = save_pdf(
-                filepaths, filenames, folderpaths, out_dir.strip(), root_dir.strip())
+            save_pdf(filepaths, filenames, folderpaths,
+                     out_dir.strip(), root_dir.strip())
             print("0、请使用pdf原文件")
             print("1、成功复制PDF后重新命名")
             print("2、成功保存发票信息至EXCEL")
@@ -349,8 +345,8 @@ if __name__ == '__main__':
     elif rename_dir is not None and rename_dir != ' ':
         rename_dir = rename_dir.replace("\\", '/').replace("//", '/')
         filepaths, filenames, folderpaths = read(rename_dir.strip())
-        if filenames != []:
-            rename_pdf(filenames)
+        if filepaths != []:
+            rename_pdf(filepaths, filenames)
             print("0、请使用pdf原文件")
             print("1、成功改名保持并替代元文件")
         else:

@@ -17,36 +17,37 @@ def re_block(text):
     return text.replace(' ', '').replace('　', '').replace('）', '').replace(')', '').replace('：', ':')
 
 
-def get_pdf(dir_path):
+def get_all(dir_path):
+    all_files_2 = []
+    all_names_2 = []
     folder_path = []
-    pdf_file_2 = []
-    pdf_names_2 = []
 
     for root, sub_dirs, file_names in os.walk(dir_path):
-        pdf_file = []
-        pdf_names = []
+        all_files = []
+        all_names = []
         root = root.replace('\\', '/')
         for name in file_names:
-            if name.endswith('.pdf') or name.endswith('.PDF'):
-                filepath = os.path.join(root, name)
-                filepath = filepath.replace('\\', '/')
-                pdf_file.append(filepath)
-                pdf_names.append(name)
-        pdf_file_2.append(pdf_file)
-        pdf_names_2.append(pdf_names)
+            all_path = os.path.join(root, name)
+            all_path = all_path.replace('\\', '/')
+            all_files.append(all_path)
+            all_names.append(name)
+        all_files_2.append(all_files)
+        all_names_2.append(all_names)
         folder_path.append(root)
 
-    return pdf_file_2, pdf_names_2, folder_path
+    return all_files_2, all_names_2, folder_path
 
 
 def read(root_dir):
-    filepaths, filenames, folderpaths = get_pdf(root_dir)
-    return filepaths, filenames, folderpaths
+    all_files_2, all_names_2, folder_paths = get_all(root_dir)
+    return all_files_2, all_names_2, folder_paths
 
 
 def new_folder(root_dir, out_dir, old_dir):
     new_dir = old_dir.replace(root_dir, out_dir)
     new_sheet = old_dir.replace(root_dir + "/", "")
+    new_sheet = new_sheet.replace("/", "_")
+    # new_sheet = new_sheet.split("/")[-1]
     if not os.path.exists(new_dir):
         # 如果目标路径不存在原文件夹的话就创建
         os.makedirs(new_dir)
@@ -78,6 +79,7 @@ def check_name(pdf_text, invoice_name=None, tax_id=None):
 
 
 def save_pdf(filepaths, filenames, folderpaths, out_dir, root_dir):
+
     for i, filepath in enumerate(filepaths):
         Repeat_name_list = []
         Repeat_num_list = []
@@ -85,30 +87,30 @@ def save_pdf(filepaths, filenames, folderpaths, out_dir, root_dir):
         if i == 0:
             new_root_dir = new_out_dir
         for j, filepathNeed in enumerate(filepath):
+            if filenames[i][j].endswith('.pdf') or filenames[i][j].endswith('.PDF'):
+                tax_id = "没检查"
+                invoice_name = "没检查"
+                with pdfplumber.open(filepathNeed) as pdf:
+                    first_page = pdf.pages[0]
+                    pdf_text = first_page.extract_text()
+                    invoice_name, tax_id = check_name(
+                        pdf_text, invoice_name, tax_id)
+                    try:
+                        list_excel = re_info_1(
+                            pdf_text, tax_id, invoice_name, filenames[i][j])
+                        out_file_name = list_excel[4] + \
+                            "-" + str(list_excel[5])
+                    except:
+                        list_excel = re_info_2(filenames[i][j])
+                        out_file_name = list_excel[4]
 
-            tax_id = "没检查"
-            invoice_name = "没检查"
+                list_excel[7] = out_file_name + ".pdf"
 
-            with pdfplumber.open(filepathNeed) as pdf:
-
-                first_page = pdf.pages[0]
-                pdf_text = first_page.extract_text()
-
-                invoice_name, tax_id = check_name(
-                    pdf_text, invoice_name, tax_id)
-
-                try:
-                    list_excel = re_info_1(
-                        pdf_text, tax_id, invoice_name, filenames[i][j])
-                    out_file_name = list_excel[4] + "-" + str(list_excel[5])
-                except:
-                    list_excel = re_info_2(filenames[i][j])
-                    out_file_name = list_excel[4]
-
-            list_excel[7] = out_file_name + ".pdf"
-
-            copy_rename(i, filepathNeed, new_out_dir, Repeat_name_list, Repeat_num_list,
-                        out_file_name, new_root_dir, new_sheet, list_excel)
+                copy_rename(i, filepathNeed, new_out_dir, Repeat_name_list, Repeat_num_list,
+                            out_file_name, new_root_dir, new_sheet, list_excel)
+            else:
+                new_out = filepathNeed.replace(root_dir, new_root_dir)
+                shutil.copy(filepathNeed, new_out)
 
     return "OK"
 
@@ -329,7 +331,7 @@ if __name__ == '__main__':
     root_dir = None
     out_dir = None
     root_dir = "E:\Code\Functional_modules\pdf_excel\demo"
-    out_dir = root_dir + "_清洗"
+    out_dir = root_dir + "_清洗_1"
     # rename_dir = "E:\Code\Functional_modules\pdf_excel\demo_清洗"
 
     if root_dir is not None and out_dir is not None and root_dir != ' ' and out_dir != ' ':
@@ -337,9 +339,8 @@ if __name__ == '__main__':
         out_dir = out_dir.replace("\\", '/').replace("//", '/')
         filepaths, filenames, folderpaths = read(root_dir.strip())
         if filepaths != []:
-            save_state = save_pdf(filepaths, filenames,
-                                  folderpaths, out_dir.strip(), root_dir.strip())
-            state = save_state
+            save_state = save_pdf(
+                filepaths, filenames, folderpaths, out_dir.strip(), root_dir.strip())
             print("0、请使用pdf原文件")
             print("1、成功复制PDF后重新命名")
             print("2、成功保存发票信息至EXCEL")

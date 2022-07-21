@@ -43,10 +43,13 @@ def read(root_dir):
     return all_files_2, all_names_2, folder_paths
 
 
-def new_folder(root_dir, out_dir, old_dir):
+def new_folder(i, root_dir, out_dir, old_dir):
     new_dir = old_dir.replace(root_dir, out_dir)
-    new_sheet = old_dir.replace(root_dir + "/", "")
-    new_sheet = new_sheet.replace("/", "_")
+    if i != 0:
+        new_sheet = old_dir.replace(root_dir + "/", "")
+        new_sheet = new_sheet.replace("/", "_")
+    else:
+        new_sheet = old_dir.split("/")[-1]
     if not os.path.exists(new_dir):
         # 如果目标路径不存在原文件夹的话就创建
         os.makedirs(new_dir)
@@ -82,7 +85,8 @@ def save_pdf(filepaths, filenames, folderpaths, out_dir, root_dir):
     for i, filepath in enumerate(filepaths):
         Repeat_name_list = []
         Repeat_num_list = []
-        new_out_dir, new_sheet = new_folder(root_dir, out_dir, folderpaths[i])
+        new_out_dir, new_sheet = new_folder(
+            i, root_dir, out_dir, folderpaths[i])
         if i == 0:
             new_root_dir = new_out_dir
         for j, filepathNeed in enumerate(filepath):
@@ -103,10 +107,14 @@ def save_pdf(filepaths, filenames, folderpaths, out_dir, root_dir):
                         list_excel = re_info_2(filenames[i][j])
                         out_file_name = list_excel[4]
 
-                list_excel[7] = out_file_name + ".pdf"
+                list_excel, Repeat_name_list = find_repeat_name(
+                    list_excel, Repeat_name_list, out_file_name)
 
-                copy_rename(i, filepathNeed, new_out_dir, Repeat_name_list, Repeat_num_list,
-                            out_file_name, new_root_dir, new_sheet, list_excel)
+                list_excel, Repeat_num_list = find_repeat_num(
+                    list_excel, Repeat_num_list)
+
+                copy_rename(i, filepathNeed, new_out_dir,
+                            new_root_dir, new_sheet, list_excel)
             else:
                 new_out = filepathNeed.replace(root_dir, new_root_dir)
                 shutil.copy(filepathNeed, new_out)
@@ -114,15 +122,7 @@ def save_pdf(filepaths, filenames, folderpaths, out_dir, root_dir):
     return "OK"
 
 
-def copy_rename(i, filepath, out_dir, Repeat_name_list, Repeat_num_list, out_file_name, new_root_dir, new_sheet, list_excel=None):
-
-    if list_excel is not None:
-        Repeat_num_list.append(list_excel[2])
-        if list_excel[2] in Repeat_num_list:
-            repeat_num = Repeat_num_list.count(list_excel[2])
-            if repeat_num > 1:
-                list_excel[3] = "重复"
-
+def find_repeat_name(list_excel, Repeat_name_list, out_file_name):
     Repeat_name_list.append(out_file_name)
     if out_file_name in Repeat_name_list:
         repeat_num = Repeat_name_list.count(out_file_name)
@@ -136,6 +136,22 @@ def copy_rename(i, filepath, out_dir, Repeat_name_list, Repeat_num_list, out_fil
                 "(" + str(repeat_num-1) + ")"
 
         list_excel[7] = out_file_name + ".pdf"
+
+    return list_excel, Repeat_name_list
+
+
+def find_repeat_num(list_excel, Repeat_num_list):
+    if list_excel is not None:
+        Repeat_num_list.append(list_excel[2])
+        if list_excel[2] in Repeat_num_list:
+            repeat_num = Repeat_num_list.count(list_excel[2])
+            if repeat_num > 1:
+                list_excel[3] = "重复"
+
+    return list_excel, Repeat_num_list
+
+
+def copy_rename(i, filepath, out_dir, new_root_dir, new_sheet, list_excel):
 
     save_excel_2(i, new_root_dir, sheet_name=new_sheet, value_list=list_excel)
 
@@ -229,7 +245,7 @@ def re_info_2(filename):
 
 def save_excel_2(i, path, sheet_name, value_list=[[]]):
     value_list = [value_list]
-    path = path + "/汇总统计DEMO.xlsx"
+    path = path + "/A_DEMO_汇总统计.xlsx"
     try:
         workbook = openpyxl.load_workbook(path)
         Sheet = workbook[sheet_name]
@@ -238,7 +254,7 @@ def save_excel_2(i, path, sheet_name, value_list=[[]]):
             workbook = openpyxl.load_workbook(path)
         except:
             workbook = openpyxl.Workbook()
-        workbook.create_sheet(sheet_name, i)
+        workbook.create_sheet(sheet_name, i+1)
         Sheet = workbook[sheet_name]
         title = ['抬头', '纳税号', '发票号码', '发票',
                  '发票类型', '金额汇总', '开票日期', '改后pdf名称', '原pdf名称']
@@ -271,6 +287,8 @@ def rename_pdf(filepaths, filenames):
             if filenames[i][j].endswith('.pdf') or filenames[i][j].endswith('.PDF'):
                 try:
                     filenameNeed = filenames[i][j].split("-")[-1]
+                    if "(" in filenameNeed:
+                        filenameNeed = filenameNeed.split("(")[0] + ".pdf"
                     Rename_list.append(filenameNeed)
                     new_name = filepathNeed.replace(
                         filenames[i][j], filenameNeed)
@@ -280,7 +298,7 @@ def rename_pdf(filepaths, filenames):
                             new_name = new_name
                         else:
                             new_name = new_name.replace(".PDF", "").replace(".pdf", "") + \
-                                "(" + str(repeat_num-1) + ")" + ".pdf"
+                                "(" + str(repeat_num) + ")" + ".pdf"
                     os.rename(filepathNeed, new_name)
                 except:
                     pass

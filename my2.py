@@ -6,6 +6,8 @@ import openpyxl
 from openpyxl.utils import get_column_letter
 from gooey import Gooey, GooeyParser
 
+import windnd
+
 
 def re_text(bt, text):
     m1 = re.search(bt, text)
@@ -113,8 +115,8 @@ def save_pdf(filepaths, filenames, folderpaths, out_dir, root_dir):
                 list_excel, Repeat_num_list = find_repeat_num(
                     list_excel, Repeat_num_list)
 
-                copy_rename(i, filepathNeed, new_out_dir,
-                            new_root_dir, new_sheet, list_excel)
+                # copy_rename(i, filepathNeed, new_out_dir,new_root_dir, new_sheet, list_excel)
+                copy_rename(filepathNeed, new_out_dir,new_root_dir, new_sheet, list_excel)
             else:
                 new_out = filepathNeed.replace(root_dir, new_root_dir)
                 shutil.copy(filepathNeed, new_out)
@@ -151,13 +153,16 @@ def find_repeat_num(list_excel, Repeat_num_list):
     return list_excel, Repeat_num_list
 
 
-def copy_rename(i, filepath, out_dir, new_root_dir, new_sheet, list_excel):
-
-    save_excel_2(i, new_root_dir, sheet_name=new_sheet, value_list=list_excel)
+def copy_rename(filepath, out_dir, new_root_dir, new_sheet, list_excel):
+# def copy_rename(i, filepath, out_dir, new_root_dir, new_sheet, list_excel):
 
     dst = os.path.join(out_dir, list_excel[7])
 
     shutil.copy(filepath, dst)
+
+    # save_excel_2(i, new_root_dir, sheet_name=new_sheet, value_list=list_excel)
+    
+    save_excel_2(new_root_dir, sheet_name=new_sheet, value_list=list_excel)
 
     return None
 
@@ -243,7 +248,8 @@ def re_info_2(filename):
     return list_excel
 
 
-def save_excel_2(i, path, sheet_name, value_list=[[]]):
+def save_excel_2(path, sheet_name, value_list=[[]]):
+# def save_excel_2(i, path, sheet_name, value_list=[[]]):
     value_list = [value_list]
     path = path + "/A_DEMO_汇总统计.xlsx"
     try:
@@ -254,7 +260,8 @@ def save_excel_2(i, path, sheet_name, value_list=[[]]):
             workbook = openpyxl.load_workbook(path)
         except:
             workbook = openpyxl.Workbook()
-        workbook.create_sheet(sheet_name, i+1)
+        # workbook.create_sheet(sheet_name, i+1)
+        workbook.create_sheet(sheet_name)
         Sheet = workbook[sheet_name]
         title = ['抬头', '纳税号', '发票号码', '发票',
                  '发票类型', '金额汇总', '开票日期', '改后pdf名称', '原pdf名称']
